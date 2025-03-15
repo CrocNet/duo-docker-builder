@@ -1,5 +1,5 @@
 # duo-docker-builder
-### Build Milk-V Duo Ubuntu images
+### Build Milk-V Duo Ubuntu images ARM64 & RISC-V
 
 
 Requires Docker installed.

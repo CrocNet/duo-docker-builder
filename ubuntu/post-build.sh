@@ -31,10 +31,6 @@ rm $ROOTFS/proc
 mkdir -p $ROOTFS/proc
 mount -t proc /proc $ROOTFS/proc
 
-echo "pre-chroot"
-read -p "Press Enter to continue..."
-
-
 # chroot into the rootfs we just created
 echo "==========  CHROOT $ROOTFS =========="
 chroot $ROOTFS /bin/bash /bootstrap.sh --second-stage --exclude vim
@@ -44,29 +40,7 @@ umount $ROOTFS/proc
 rm $ROOTFS/bootstrap.sh
 
 
-#if [ -L ${OUTPUT_DIR}/fs ]; then
-#  rm ${OUTPUT_DIR}/fs
-#fi
-
-
 cp ${OUTPUT_DIR}/tmp-rootfs/etc/fstab $ROOTFS/etc/.
 
 
-echo "post-chroot  CONFIG_BUILDROOT_FS=$CONFIG_BUILDROOT_FS"
-read -p "Press Enter to continue..."
-
-
-#mv ${OUTPUT_DIR}/br-rootfs ${OUTPUT_DIR}/br-rootfs_busybox
-#mv $ROOTFS br-rootfs
-
-
-#cp ${OUTPUT_DIR}/tmp-rootfs/etc/fstab $ROOTFS/etc/.
-
-
-#ln -s $ROOTFS ${OUTPUT_DIR}/fs
-#ln -s $ROOTFS ${OUTPUT_DIR}/br-rootfs
-
- 
-#cd /duo-buildroot-sdk/install
-#/duo-buildroot-sdk/device/gen_burn_image_sd.sh $OUTPUT_DIR
 
