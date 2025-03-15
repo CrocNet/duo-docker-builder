@@ -7,7 +7,7 @@ export MV_BOARD_LINK=sg2000_milkv_duos_glibc_arm64_emmc
 
 export DISTRO="noble"
 export DISTRO_URL="http://ports.ubuntu.com/ubuntu-ports"
-export DISTRO_HOSTNAME="milkvduo-ubuntu"
+export DISTRO_HOSTNAME=${DISTRO_HOSTNAME:-milkvduo-ubuntu}
 export ROOTPW=${ROOTPW:-milkv}
 
 export CONFIG_BUILDROOT_FS=n
