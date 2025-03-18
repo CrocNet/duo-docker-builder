@@ -2,9 +2,13 @@
 
 set -e
 
-#source ENV
+if [ -z "$DISTRO" ]; then
+    echo "No DISTRO set - skipping"
+    return 0
+fi
 
-ROOTFS=${OUTPUT_DIR}/rootfs
+
+ROOTFS=${OUTPUT_DIR}/rootfs-ubuntu
 mkdir -p $ROOTFS
 
 
@@ -16,6 +20,12 @@ case "$ARCH" in
         QEMU="qemu-riscv64-static"
         ;;
 esac
+
+
+if [ "$PBDEBUG" = true ]; then
+    echo "PRE debootstrap first stage Press Enter to continue..."
+    read
+fi
 
 
 # generate minimal bootstrap rootfs
@@ -31,6 +41,13 @@ rm $ROOTFS/proc
 mkdir -p $ROOTFS/proc
 mount -t proc /proc $ROOTFS/proc
 
+
+if [ "$PBDEBUG" = true ]; then
+    echo "PRE debootstrap second stage - Press Enter to continue..."
+    read
+fi
+
+
 # chroot into the rootfs we just created
 echo "==========  CHROOT $ROOTFS =========="
 chroot $ROOTFS /bin/bash /bootstrap.sh --second-stage --exclude vim
@@ -39,8 +56,21 @@ echo "========== EXIT CHROOT =========="
 umount $ROOTFS/proc
 rm $ROOTFS/bootstrap.sh
 
+if [ "$PBDEBUG" = true ]; then
+    echo "POST-CHROOT - Press Enter to continue..."
+    read
+fi
 
+
+#Copy the fstab from the default build
 cp ${OUTPUT_DIR}/tmp-rootfs/etc/fstab $ROOTFS/etc/.
 
 
+mv ${OUTPUT_DIR}/rootfs ${OUTPUT_DIR}/rootfs-busybox
+mv $ROOTFS ${OUTPUT_DIR}/rootfs
 
+
+if [ "$PBDEBUG" = true ]; then
+    echo "POST-BUILD DEBUG end - Press Enter to continue..."
+    read
+fi

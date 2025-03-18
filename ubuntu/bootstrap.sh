@@ -42,8 +42,8 @@ cat >>/etc/network/interfaces <<EOF
 auto lo
 iface lo inet loopback
 
-auto end0
-iface end0 inet dhcp
+auto eth0
+iface eth0 inet dhcp
 
 EOF
 

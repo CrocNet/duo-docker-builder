@@ -10,8 +10,6 @@ export DISTRO_URL="http://ports.ubuntu.com/ubuntu-ports"
 export DISTRO_HOSTNAME=${DISTRO_HOSTNAME:-milkvduo-ubuntu}
 export ROOTPW=${ROOTPW:-milkv}
 
-export CONFIG_BUILDROOT_FS=n
-
 SCRIPT_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 KERNEL="$SCRIPT_DIR/kernel.conf"
 

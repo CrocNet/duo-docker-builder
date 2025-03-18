@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 IMAGE_DIR="images"
 
@@ -154,7 +155,13 @@ echo "Syncing..."
 sync
 echo "Copy complete."
 
+# Inform the OS of partition table changes
+sudo partprobe "$SD_CARD_DEVICE"
+
+
 echo "Expaning rootfs..."
+
+fdisk -l $SD_CARD_DEVICE
 # Identify the last partition
 # Get the number of the last partition
 PART_NUM=$(sudo parted $SD_CARD_DEVICE -ms print | awk -F: 'END{print $1}')
@@ -166,23 +173,31 @@ else
     PART_DEV="${SD_CARD_DEVICE}${PART_NUM}"
 fi
 
-# Remove the last partition and recreate it using the full space
-parted $SD_CARD_DEVICE rm $PART_NUM
-parted $SD_CARD_DEVICE --script -- unit s mkpart primary $START 100%
-
-# Inform the OS of partition table changes
-partprobe $SD_CARD_DEVICE
-sleep 1  # Allow time for the system to recognize the new partition
-
 # Check if the partition exists
 if [ ! -b "$PART_DEV" ]; then
     echo "Error: Partition $PART_DEV does not exist."
     exit 1
 fi
 
-# Resize the filesystem
-resize2fs "$PART_DEV"
+FS_TYPE=$(sudo blkid -o value -s TYPE "$PART_DEV")
+if [[ "$FS_TYPE" != "ext2" && "$FS_TYPE" != "ext3" && "$FS_TYPE" != "ext4" ]]; then
+    echo "Error: Partition $PART_DEV is not an ext2/3/4 filesystem."
+    exit 1
+fi
+
+# Resize last partition to extend to 100% of the disk
+sudo parted $SD_CARD_DEVICE resizepart $PART_NUM 100%
+
 sync
+
+fdisk -l $SD_CARD_DEVICE
+
+
+sudo e2fsck -f "$PART_DEV"
+if [ $? -ge 4 ]; then
+    echo "Error: Filesystem check failed with critical errors."
+    exit 1
+fi
 
 echo "Partition and filesystem resize completed."
 

@@ -48,6 +48,13 @@ RUN sed -i 's/\${OUTPUT_DIR}\/\${MILKV_BOARD/\${OUTPUT_DIR}\/\${MV_BOARD/g' buil
 # Modify build.sh to insert our post build scripts.
 RUN sed -i 's/^milkv_build$/milkv_build\nif [ -f post-build.sh ]; then source post-build.sh; fi/' build.sh
 
+#Modify Makefile so that CONFIG_BUILDROOT_FS is not set when packaging sd card and $DISTRO is set
+RUN sed -i '/^sd_image:/a \	$(eval CONFIG_BUILDROOT_FS := $(shell [ -n "$$DISTRO" ] && echo "n"))' build/Makefile
+
+#Modify SD card gen to recognise Distro.
+RUN sed -i '/^genimage/i if [ -n "$DISTRO" ]; then rm -f ${OUTPUT_DIR}/fs; ln -s ${OUTPUT_DIR}/rootfs ${OUTPUT_DIR}/fs; fi' device/gen_burn_image_sd.sh
+
+
 RUN mkdir -p /duo-buildroot-sdk/install
 
 COPY ubuntu/post-build.sh .
