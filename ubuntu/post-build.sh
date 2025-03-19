@@ -9,35 +9,25 @@ fi
 
 
 ROOTFS=${OUTPUT_DIR}/rootfs-ubuntu
-mkdir -p $ROOTFS
-
-
-case "$ARCH" in
-    "arm64")
-        QEMU="qemu-aarch64-static"
-        ;;
-    "riscv64")
-        QEMU="qemu-riscv64-static"
-        ;;
-esac
-
 
 if [ "$PBDEBUG" = true ]; then
     echo "PRE debootstrap first stage Press Enter to continue..."
     read
 fi
 
-
-# generate minimal bootstrap rootfs
 update-binfmts --enable
-debootstrap --exclude vim --arch=$ARCH --foreign $DISTRO $ROOTFS $BASE_URL
-
-cp -rf /usr/bin/$QEMU $ROOTFS/usr/bin/
-cp bootstrap.sh $ROOTFS/.
+# generate minimal bootstrap rootfs
+if [ -d "$DISTRO_FS" ]; then
+  echo "Using prebuilt $DISTRO_FS"
+  mv $DISTRO_FS $ROOTFS
+else
+  debootstrap --exclude vim --arch=$ARCH --foreign $DISTRO $ROOTFS $BASE_URL
+  cp -rf /usr/bin/$QEMU $ROOTFS/usr/bin/
+  cp bootstrap.sh $ROOTFS/.
+fi
 
 
 # Fix poor qemu speed https://unix.stackexchange.com/questions/759188/some-binaries-are-extremely-slow-with-qemu-user-static-inside-docker
-rm $ROOTFS/proc
 mkdir -p $ROOTFS/proc
 mount -t proc /proc $ROOTFS/proc
 

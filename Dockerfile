@@ -33,11 +33,16 @@ CMD bash build.sh lunch
 
 FROM build AS duo-ubuntu
 
+ARG DISTRO=noble
+ENV DISTRO=${DISTRO}
+
+ARG DISTRO_URL=http://ports.ubuntu.com/ubuntu-ports
+ENV DISTRO_URL=${DISTRO_URL}
+
+ENV DISTRO_FS=/duo-buildroot-sdk/distro-fs
 
 # Required for ubuntu build
-RUN apt install -y debootstrap qemu qemu-user-static binfmt-support dpkg-cross --no-install-recommends \
-                 gcc-aarch64-linux-gnu gcc-aarch64-linux-gnu g++-aarch64-linux-gnu binutils-aarch64-linux-gnu \
-                 gcc-riscv64-linux-gnu g++-riscv64-linux-gnu binutils-riscv64-linux-gnu
+RUN apt install -y debootstrap qemu qemu-user-static binfmt-support dpkg-cross --no-install-recommends
 
 WORKDIR /duo-buildroot-sdk
 
@@ -60,5 +65,50 @@ RUN mkdir -p /duo-buildroot-sdk/install
 COPY ubuntu/post-build.sh .
 COPY ubuntu/bootstrap.sh .
 COPY device/ device/
+
+CMD bash build.sh lunch
+
+# ------------------------------------------------------------------------------
+
+FROM duo-ubuntu AS duo-ubuntu-arm64
+
+RUN apt install -y gcc-aarch64-linux-gnu gcc-aarch64-linux-gnu g++-aarch64-linux-gnu binutils-aarch64-linux-gnu 
+
+WORKDIR /duo-buildroot-sdk
+
+ENV ARCH=arm64
+ENV QEMU="qemu-aarch64-static"
+
+
+# generate minimal bootstrap rootfs
+RUN update-binfmts --enable
+RUN debootstrap --exclude vim --arch=$ARCH --foreign $DISTRO $DISTRO_FS $DISTRO_URL
+RUN cp -rf /usr/bin/$QEMU $DISTRO_FS/usr/bin/
+RUN cp bootstrap.sh $DISTRO_FS/.
+
+COPY device/*arm* device/
+RUN rm -rf device/*risc*
+
+CMD bash build.sh lunch
+# ------------------------------------------------------------------------------
+
+FROM duo-ubuntu AS duo-ubuntu-riscv64
+
+ENV ARCH=riscv64
+ENV QEMU="qemu-riscv64-static"
+
+
+RUN apt install -y gcc-riscv64-linux-gnu g++-riscv64-linux-gnu binutils-riscv64-linux-gnu 
+
+WORKDIR /duo-buildroot-sdk
+
+# generate minimal bootstrap rootfs
+RUN update-binfmts --enable
+RUN debootstrap --exclude vim --arch=$ARCH --foreign $DISTRO $DISTRO_FS $DISTRO_URL
+RUN cp -rf /usr/bin/$QEMU $DISTRO_FS/usr/bin/
+RUN cp bootstrap.sh $DISTRO_FS/.
+
+COPY device/*risc* device/
+RUN rm -rf device/*arm*
 
 CMD bash build.sh lunch
