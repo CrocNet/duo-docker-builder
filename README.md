@@ -3,6 +3,8 @@
 
 #### Pulls latest Milk-V SDK, and makes changes to build your own distro.
 
+![imgConsole](https://github.com/CrocNet/.github/blob/main/images/imgConsole.png)
+
   
 Requires Docker.  Runs on Ubuntu (should work on all debian based distros)
 
