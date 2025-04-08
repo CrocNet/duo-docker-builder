@@ -4,12 +4,14 @@
 Requires Docker.  Runs on Ubuntu (should work on all debian based distros)
 
 1. Create a distro
+
     git clone https://github.com/CrocNet/CrocNetDistro.git
     cd CrocNetDistro
     ./run.sh
     cd ..
 
 2. Instal Docker Builder 
+
     git clone https://github.com/CrocNet/duo-docker-builder.git  
     cd duo-docker-builder  
 
