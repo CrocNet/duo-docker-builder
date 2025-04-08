@@ -3,6 +3,9 @@
 
 #### Pulls latest Milk-V SDK, and makes changes to build your own distro.
 
+Use our Ubuntu & Debian templates to build you own distro. Menu driven image
+writing to SD card.
+
 ![imgConsole](https://github.com/CrocNet/.github/blob/main/images/imgConsole.png)
 
   
