@@ -1,10 +1,11 @@
 #!/bin/bash
 
+#Executed by Buildroot, during build process
+
 set -x
 set -e
 
 TROOTFS="${BR_DIR}/output/${BR_BOARD}/target"
-
 
 
 DIRS_TO_MERGE=("/bin" "/lib" "/sbin")
@@ -21,7 +22,6 @@ for dir in "${DIRS_TO_MERGE[@]}"; do
             echo "  -> $dir is a directory, not a symlink. Merging..."
 
             # 1. Move contents (using find for better handling of files/links)
-            #    Handles hidden files and spaces. Requires root.
             echo "     Moving contents of $dir to $target_dir..."
             find "${TROOTFS}/$dir" -mindepth 1 -maxdepth 1 -exec mv -t "${TROOTFS}/$target_dir/" {} +
             if [[ $? -ne 0 ]]; then
@@ -29,7 +29,7 @@ for dir in "${DIRS_TO_MERGE[@]}"; do
                  continue # Skip to next directory in the loop
             fi
 
-            # 2. Remove the now-empty original directory. Requires root.
+            # 2. Remove the now-empty original directory.
             echo "     Removing original directory $dir..."
             rmdir "${TROOTFS}/$dir"
              if [[ $? -ne 0 ]]; then
@@ -37,12 +37,11 @@ for dir in "${DIRS_TO_MERGE[@]}"; do
                  continue # Skip to next directory in the loop
             fi
 
-            # 3. Create the relative symbolic link. Requires root.
+            # 3. Create the relative symbolic link.
             echo "     Creating symlink $dir -> $relative_target..."
             ln -s "$relative_target" "${TROOTFS}/$dir"
              if [[ $? -ne 0 ]]; then
                  echo "     ERROR: Failed to create symlink for $dir."
-                 # System might be inconsistent here!
                  continue # Skip to next directory in the loop
             fi
 
@@ -56,18 +55,17 @@ for dir in "${DIRS_TO_MERGE[@]}"; do
 done
 
 
-# The standard ld.so.conf usually just includes the .d directory
+# Create a ld.so.conf to includes the .d directory
 printf "%s\n" "include /etc/ld.so.conf.d/*.conf" >> ${TROOTFS}/etc/ld.so.conf
 chmod 644 ${TROOTFS}/etc/ld.so.conf
 
-# Create the directory if it doesn't exist (-p avoids error if it exists)
+# Create the .d directory
 mkdir -p ${TROOTFS}/etc/ld.so.conf.d
 chmod 755 ${TROOTFS}/etc/ld.so.conf.d
 
 # Create the specific conf file pointing to /usr/lib
 printf "%s\n" "/usr/lib" > ${TROOTFS}/etc/ld.so.conf.d/libc.conf
 chmod 644 ${TROOTFS}/etc/ld.so.conf.d/libc.conf
-
 
 dirs=(${TROOTFS}/usr/lib/*-linux-gnu)
 if [ -d "${dirs[0]}" ]; then
@@ -78,5 +76,5 @@ if [ -d "${dirs[0]}" ]; then
   chmod 644 ${TROOTFS}/etc/ld.so.conf.d/arch.conf  
 fi
 
-# Run ldconfig
+# Run ldconfig, using proot (chroot-lite)
 proot -S "${TROOTFS}" -q ${QEMU} /sbin/ldconfig -v
