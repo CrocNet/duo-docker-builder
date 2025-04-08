@@ -20,11 +20,11 @@ Requires Docker.  Runs on Ubuntu (should work on all debian based distros)
     cd duo-docker-builder  
 ````
   
-3. Run
+3. Run (menu driven)
   
 This builds the image, using duo-buildroot-sdk-v2  
 ````
-    /run.sh  
+    ./run.sh  
 ````
 
 Your complete image will be in the `images` directory.  
