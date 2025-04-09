@@ -44,10 +44,10 @@ for dir in "${DIRS_TO_MERGE[@]}"; do
                  echo "     ERROR: Failed to create symlink for $dir."
                  continue # Skip to next directory in the loop
             fi
-
             echo "  -> Merge completed for $dir."
         else
-            echo "  -> $dir is not a directory or a symlink. Skipping."
+            echo "  -> $dir is not a directory or a symlink."
+            ln -s "$relative_target" "${TROOTFS}/$dir"
         fi
     else
         echo "  -> $dir is already a symbolic link. Skipping."
@@ -70,11 +70,10 @@ chmod 644 ${TROOTFS}/etc/ld.so.conf.d/libc.conf
 dirs=(${TROOTFS}/usr/lib/*-linux-gnu)
 if [ -d "${dirs[0]}" ]; then
   ARCHDIR="/usr/lib/${dirs[0]##*/}"  
-  rsync -a --remove-source-files ${TROOTFS}${ARCHDIR}/ ${TROOTFS}/usr/lib/
-  
-  echo ${TROOTFS}${ARCHDIR}  | tee -a ${TROOTFS}/etc/ld.so.conf.d/arch.conf > /dev/null
+  echo ${ARCHDIR}  | tee -a ${TROOTFS}/etc/ld.so.conf.d/arch.conf > /dev/null
   chmod 644 ${TROOTFS}/etc/ld.so.conf.d/arch.conf  
 fi
 
 # Run ldconfig, using proot (chroot-lite)
 proot -S "${TROOTFS}" -q ${QEMU} /sbin/ldconfig -v
+

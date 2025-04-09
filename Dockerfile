@@ -57,7 +57,9 @@ RUN sed -i 's/\(BR2_TARGET_ROOTFS_EXT2_SIZE="\)[^"]*/\11G/' /duo-buildroot-sdk/b
 RUN sed -i '/label="ROOTFS"/ s/size_in_kb="[0-9]*"/size_in_kb="1258291"/' /duo-buildroot-sdk/build/boards/cv181x/*milkv_duos*_emmc/partition/partition_emmc.xml
 
 #Add our distro RootFS as SKELETON & add post build script
-RUN find /duo-buildroot-sdk/buildroot-2024.02/configs -type f -name '*_defconfig' -exec sh -c 'echo "BR2_ROOTFS_SKELETON_CUSTOM=y\nBR2_ROOTFS_SKELETON_CUSTOM_PATH=\"${ROOTFS_OVERLAY}\"\nBR2_ROOTFS_POST_BUILD_SCRIPT=\"/post_build.sh\"" >> {}' \;
+RUN find /duo-buildroot-sdk/buildroot-2024.02/configs -type f -name '*_defconfig' -exec sh \
+              -c 'echo "BR2_ROOTFS_SKELETON_CUSTOM=y\nBR2_ROOTFS_SKELETON_CUSTOM_PATH=\"${ROOTFS_OVERLAY}\"\nBR2_ROOTFS_POST_BUILD_SCRIPT=\"/post_build.sh\"\nBR2_INIT_BUSYBOX=n\nBR2_PACKAGE_BUSYBOX=n" >> {}' \;
+
 COPY post_build.sh /
 RUN chmod +x /post_build.sh
 
