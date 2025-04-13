@@ -1,8 +1,8 @@
-## Build Milk-V Duo Image Builder
+## Milk-V Duo Docker Image Builder
 ### ARM64, RISC-V, Ubuntu, Debian, Busybox
 #### Pulls latest Milk-V SDK.
 
-Use our the included templates to build you own distro. Menu driven image writing to SD card.
+Use included templates to build you own distro. Menu driven image writing to SD card.
 
 ![imgConsole](https://github.com/CrocNet/.github/blob/main/images/imgConsole.png)
 

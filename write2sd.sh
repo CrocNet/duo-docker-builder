@@ -103,8 +103,8 @@ if mount | grep -q "$IMAGE_FILE"; then
 fi
 
 while true; do
-    # Get the list of removable devices and store it in a variable
-    DEVICE_LIST=$(lsblk -d -n -p -o NAME,SIZE,RM | awk '$3=="1"{print $1, "("$2")"}')
+    # Get the list of removable devices with size > 0 and store it in a variable
+    DEVICE_LIST=$(lsblk -d -n -p -o NAME,SIZE,RM | awk '$3=="1" && $2 != "0B" {print $1, "("$2")"}')
     DEVICE_LIST_ARRAY=($DEVICE_LIST "rescan" "(rescan devices)")
 
     # Use whiptail to show a menu to select the SD card, including a rescan option
@@ -121,7 +121,6 @@ while true; do
         break # Exit loop if a device other than rescan is selected
     fi
 done
-
 
 # Confirm before proceeding
 if ! whiptail --yesno "Are you sure you want to write to $SD_CARD_DEVICE?" 10 60; then
