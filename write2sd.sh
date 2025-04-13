@@ -132,7 +132,7 @@ fi
 
 # Unmount the SD card
 echo "Unmounting $SD_CARD_DEVICE..."
-sudo umount ${SD_CARD_DEVICE}* 2> /dev/null || true  # Proceed even if unmount fails, but check next
+umount ${SD_CARD_DEVICE}* 2> /dev/null || true  # Proceed even if unmount fails, but check next
 if mount | grep -q "^$SD_CARD_DEVICE"; then
     echo "Error: Failed to unmount $SD_CARD_DEVICE partitions. Please ensure no partitions are in use."
     exit 1
@@ -143,20 +143,20 @@ set -e
 
 # Copy the image to the SD card using dd
 IMAGE_SIZE=$(stat -c %s "$IMAGE_FILE")
-SD_SIZE=$(sudo blockdev --getsize64 "$SD_CARD_DEVICE")
+SD_SIZE=$(blockdev --getsize64 "$SD_CARD_DEVICE")
 if [ "$IMAGE_SIZE" -gt "$SD_SIZE" ]; then
     echo "Error: SD card ($SD_SIZE bytes) is smaller than image ($IMAGE_SIZE bytes)."
     exit 1
 fi
 echo "Copying image to $SD_CARD_DEVICE. This may take a while..."
-sudo dd if="$IMAGE_FILE" of="$SD_CARD_DEVICE" bs=4M status=progress conv=fdatasync
+dd if="$IMAGE_FILE" of="$SD_CARD_DEVICE" bs=4M status=progress conv=fdatasync
 
 echo "Syncing..."
 sync
 echo "Copy complete."
 
 # Inform the OS of partition table changes
-sudo partprobe "$SD_CARD_DEVICE"
+partprobe "$SD_CARD_DEVICE"
 
 
 echo "Expaning rootfs..."
@@ -164,7 +164,7 @@ echo "Expaning rootfs..."
 fdisk -l $SD_CARD_DEVICE
 # Identify the last partition
 # Get the number of the last partition
-PART_NUM=$(sudo parted $SD_CARD_DEVICE -ms print | awk -F: 'END{print $1}')
+PART_NUM=$(parted $SD_CARD_DEVICE -ms print | awk -F: 'END{print $1}')
 
 # Determine the correct partition device name
 if [[ $SD_CARD_DEVICE == /dev/mmcblk* ]]; then
@@ -179,21 +179,21 @@ if [ ! -b "$PART_DEV" ]; then
     exit 1
 fi
 
-FS_TYPE=$(sudo blkid -o value -s TYPE "$PART_DEV")
+FS_TYPE=$(blkid -o value -s TYPE "$PART_DEV")
 if [[ "$FS_TYPE" != "ext2" && "$FS_TYPE" != "ext3" && "$FS_TYPE" != "ext4" ]]; then
     echo "Error: Partition $PART_DEV is not an ext2/3/4 filesystem."
     exit 1
 fi
 
 # Resize last partition to extend to 100% of the disk
-sudo parted $SD_CARD_DEVICE resizepart $PART_NUM 100%
+parted $SD_CARD_DEVICE resizepart $PART_NUM 100%
 
 sync
 
 fdisk -l $SD_CARD_DEVICE
 
 
-sudo e2fsck -f "$PART_DEV"
+e2fsck -f "$PART_DEV"
 if [ $? -ge 4 ]; then
     echo "Error: Filesystem check failed with critical errors."
     exit 1

@@ -1,17 +1,15 @@
-## Build Milk-V Duo Ubuntu images ARM64 & RISC-V  
-  
+## Build Milk-V Duo Image Builder
+### ARM64, RISC-V, Ubuntu, Debian, Busybox
+#### Pulls latest Milk-V SDK.
 
-#### Pulls latest Milk-V SDK, and makes changes to build your own distro.
-
-Use our Ubuntu & Debian templates to build you own distro. Menu driven image
-writing to SD card.
+Use our the included templates to build you own distro. Menu driven image writing to SD card.
 
 ![imgConsole](https://github.com/CrocNet/.github/blob/main/images/imgConsole.png)
 
   
 Requires Docker.  Runs on Ubuntu (should work on all debian based distros)
 
-1. Create a distro
+1. Create Ubuntu/Debian distro (Optional)
 ````
     git clone https://github.com/CrocNet/CrocNetDistro.git
     cd CrocNetDistro

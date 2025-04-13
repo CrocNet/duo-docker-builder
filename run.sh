@@ -2,9 +2,10 @@
 
 
 #Defaults
-DISTRO_HOSTNAME=milkvduo-ubuntu
+DISTRO_HOSTNAME=milkvduo
 ROOTPW=milkv
 
+POSTBUILD="Distro/post_build.sh"
 
 # Check if whiptail is installed
 if ! command -v whiptail &> /dev/null; then
@@ -64,17 +65,17 @@ function start() {
 
   [ "$DOBUILD" = "true" ] && CACHE="--no-cache"
    
-  if [ -n "$ROOTFS_TAR" ]; then
-    IMAGE=duosdk-${ARCH}
-  else
-    IMAGE=duosdk
-  fi       
 
   mkdir -p images
   
-  docker build . -t ${IMAGE} --network=host ${CACHE} --build-arg CACHE_BUST=$(date +%s) --target ${IMAGE}
+  docker build . -t ${IMAGE} --network=host ${CACHE} --build-arg CACHE_BUST=$(date +%s) \
+        --build-arg DISTRO_HOSTNAME=${DISTRO_HOSTNAME} \
+        --build-arg ROOTPW=${ROOTPW} \
+        --build-arg BUSYBOX_CONF=${BUSYBOX_CONF} \
+        --build-arg POSTBUILD=${POSTBUILD} \
+  	--target ${IMAGE}
   
-  docker run --rm -it --net=host \
+  docker run --rm -it --net=host --privileged \
              -v ./images:/duo-buildroot-sdk/out \
              -e DISTRO_HOSTNAME="${DISTRO_HOSTNAME}" -e ROOTPW="${ROOTPW}" \
              -e PBDEBUG="${PBDEBUG}" \
@@ -84,16 +85,15 @@ function start() {
 }
 
 check_docker_image() {
-    local image_name="duosdk-${ARCH}"
     local creation_date=""
     local image_info=""
 
     # Check if the image exists locally
-    if docker images --format '{{.Repository}}' | grep -q "^${image_name}$"; then
+    if docker images --format '{{.Repository}}' | grep -q "^${IMAGE}$"; then
         # Get the creation date in YYYY-MM-DD HH:MM:SS format
-        creation_date=$(docker inspect --format '{{.Created}}' "${image_name}" | 
+        creation_date=$(docker inspect --format '{{.Created}}' "${IMAGE}" | 
                        cut -d'T' -f1)
-        image_info="${image_name} ${creation_date}"
+        image_info="${IMAGE} ${creation_date}"
         
         # Present menu using whiptail
         choice=$(whiptail --title "Docker Image Selection" \
@@ -109,6 +109,7 @@ check_docker_image() {
 function select_distro() {
     # Array to store matching files
     declare -a tar_files=()
+    declare -a conf_dirs=()
    
     # Search current directory and subdirectories with absolute paths
     while IFS= read -r -d '' file; do
@@ -126,11 +127,29 @@ function select_distro() {
         done < <(find "../CrocNetDistro" -name "rootfs" -type d -prune -o -type f -name "*-$ARCH*-*.tar.gz" -print0)
     fi
    
+    # --- Search for directories containing busybox.conf in current directory ---
+    echo "Searching for directories containing busybox.conf in $(pwd)..."
+    for dir in */; do
+        # Check if it's actually a directory and contains the file
+        # Make sure dir doesn't literally match "*/" if no dirs are found
+        if [ -d "$dir" ] && [ -f "${dir}busybox.conf" ]; then
+            # Store the relative path (e.g., ./mydir/ or mydir/)
+            conf_dirs+=("$dir")
+        fi
+    done
+   
     # Prepare menu options (showing only filenames)
-    menu_options=("Default Busybox" "")
+   # menu_options=("Busybox BASH" "")
     for file in "${tar_files[@]}"; do
         filename=$(basename "$file")
         menu_options+=("$filename" "")
+    done
+   
+    # Add found configuration directories (showing directory names)
+    for dir in "${conf_dirs[@]}"; do
+        # Remove trailing slash for cleaner display if present
+        dir_name=$(basename "$dir")
+        menu_options+=("$dir_name" "")
     done
    
     # Show whiptail menu and get selection
@@ -140,9 +159,11 @@ function select_distro() {
     if [ $? -ne 0 ]; then
         exit 0
     fi
-   
+
     # If Default Busybox was selected, return without setting ROOTFS_TAR
-    if [ "$selected" = "Default Busybox" ]; then
+    if [[ ! "$selected" = *.gz ]]; then
+        POSTBUILD="$selected/post_build.sh"
+        BUSYBOX_CONF="$selected/busybox.conf"
         return 0
     fi
    
@@ -151,11 +172,11 @@ function select_distro() {
         if [ "$(basename "$file")" = "$selected" ]; then
             # Ensure ROOTFS_TAR is an absolute path
             ROOTFS_TAR=$(realpath "$file")
-            break
+            return 0
         fi
     done
-
-    return 0
+    echo "Failed to find $selected"
+    exit 1
 }
 
 CHOICE=$(whiptail --title "Architecture Selection" --menu "Choose an architecture:" 15 60 2 \
@@ -178,7 +199,6 @@ fi
 
 [ -z "$ARCH" ] && exit 0
 
-check_docker_image
 
 [ -z "$ROOTFS_TAR" ] && select_distro
 
@@ -189,12 +209,41 @@ if [ -n "$ROOTFS_TAR" ]; then
       exit 1
   fi
 
-  # Check if ROOTFS_TAR is not in the current directory
-#  if [ ! -e "./$(basename "$ROOTFS_TAR")" ]; then
-      # Remove any existing file or symlink named rootfs.tar.gz
-      rm -f ./rootfs.tar.gz
-      cp "$ROOTFS_TAR" ./rootfs.tar.gz
- # fi
+  rm -f ./rootfs.tar.gz
+  cp "$ROOTFS_TAR" ./rootfs.tar.gz
+  IMAGE=duosdk-${ARCH}
+else
+  IMAGE=duosdk-busybox-${ARCH}
+fi
+
+check_docker_image
+
+# Prompt the user, pre-filling with the current value
+NEW_HOSTNAME=$(whiptail --title "Hostname Setup" \
+                   --inputbox "Enter the desired hostname:" 10 60 \
+                   "$DISTRO_HOSTNAME" \
+                   3>&1 1>&2 2>&3) # Capture stderr to stdout
+
+# Check exit status ($?): 0 means OK, non-zero means Cancel/Esc
+exitstatus=$?
+if [ $exitstatus = 0 ]; then
+    DISTRO_HOSTNAME="$NEW_HOSTNAME" # Update variable only if OK was pressed
+    echo "Hostname set to: $DISTRO_HOSTNAME"
+else
+    exit 1
+fi
+
+NEW_ROOTPW=$(whiptail --title "Root Password Setup" \
+                 --inputbox "Enter the root password:" 10 60 \
+                 "$ROOTPW" \
+                 3>&1 1>&2 2>&3) # Capture stderr to stdout
+
+exitstatus=$?
+if [ $exitstatus = 0 ]; then
+    ROOTPW="$NEW_ROOTPW"
+    echo "Root password has been set/updated."
+else
+    exit 1
 fi
 
 

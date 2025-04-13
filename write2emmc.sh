@@ -103,8 +103,8 @@ if mount | grep -q "$IMAGE_FILE"; then
 fi
 
 while true; do
-    # Get the list of removable devices and store it in a variable
-    DEVICE_LIST=$(lsblk -d -n -p -o NAME,SIZE,RM | awk '$3=="1"{print $1, "("$2")"}')
+    # Get the list of removable devices with size > 0 and store it in a variable
+    DEVICE_LIST=$(lsblk -d -n -p -o NAME,SIZE,RM | awk '$3=="1" && $2 != "0B" {print $1, "("$2")"}')
     DEVICE_LIST_ARRAY=($DEVICE_LIST "rescan" "(rescan devices)")
 
     # Use whiptail to show a menu to select the SD card, including a rescan option
@@ -122,7 +122,6 @@ while true; do
     fi
 done
 
-
 # Confirm before proceeding
 if ! whiptail --yesno "Are you sure you want to write to $SD_CARD_DEVICE?" 10 60; then
     echo "Operation cancelled."
@@ -130,69 +129,79 @@ if ! whiptail --yesno "Are you sure you want to write to $SD_CARD_DEVICE?" 10 60
 fi
 
 
-# Unmount the SD card
-echo "Unmounting $SD_CARD_DEVICE..."
-sudo umount ${SD_CARD_DEVICE}* 2> /dev/null || true  # Proceed even if unmount fails, but check next
+# Check if the SD card is mounted before unmounting
 if mount | grep -q "^$SD_CARD_DEVICE"; then
-    echo "Error: Failed to unmount $SD_CARD_DEVICE partitions. Please ensure no partitions are in use."
-    exit 1
+    echo "Unmounting $SD_CARD_DEVICE..."
+    umount ${SD_CARD_DEVICE}* 2> /dev/null
+    # Check again to ensure unmount succeeded
+    if mount | grep -q "^$SD_CARD_DEVICE"; then
+        echo "Error: Failed to unmount $SD_CARD_DEVICE partitions. Please ensure no partitions are in use."
+        exit 1
+    fi
 fi
-
 
 set -e
 
-# Copy the image to the SD card using dd
+# Check SD card size
 IMAGE_SIZE=$(stat -c %s "$IMAGE_FILE")
-SD_SIZE=$(sudo blockdev --getsize64 "$SD_CARD_DEVICE")
+SD_SIZE=$(blockdev --getsize64 "$SD_CARD_DEVICE")
 if [ "$IMAGE_SIZE" -gt "$SD_SIZE" ]; then
     echo "Error: SD card ($SD_SIZE bytes) is smaller than image ($IMAGE_SIZE bytes)."
     exit 1
 fi
 
-
 # Format the SD card to FAT32
 echo "Formatting $SD_CARD_DEVICE to FAT32..."
-sudo mkfs.vfat -I -F 32 "$SD_CARD_DEVICE"
+mkfs.vfat -I -F 32 "$SD_CARD_DEVICE"
 if [ $? -ne 0 ]; then
     echo "Error: Failed to format $SD_CARD_DEVICE."
     exit 1
 fi
 
+# Define a cleanup function
+cleanup() {
+    # Check if MOUNT_POINT is a mount point and unmount it if so
+    if mountpoint -q "$MOUNT_POINT" 2>/dev/null; then
+        umount "$MOUNT_POINT"
+    fi
+    # Remove the directory if it still exists
+    if [ -d "$MOUNT_POINT" ]; then
+        rmdir "$MOUNT_POINT"
+    fi
+}
+
+# Set the trap to call cleanup on script exit
+trap cleanup EXIT
+
 # Create a temporary mount point
 MOUNT_POINT=$(mktemp -d)
 echo "Mounting $SD_CARD_DEVICE to $MOUNT_POINT..."
-sudo mount "$SD_CARD_DEVICE" "$MOUNT_POINT"
+mount "$SD_CARD_DEVICE" "$MOUNT_POINT"
 if [ $? -ne 0 ]; then
     echo "Error: Failed to mount $SD_CARD_DEVICE."
-    sudo rmdir "$MOUNT_POINT"
+    rmdir "$MOUNT_POINT"
     exit 1
 fi
 
 # Unzip the image file onto the SD card with progress
 echo "Unzipping $IMAGE_FILE to $SD_CARD_DEVICE (mounted at $MOUNT_POINT)..."
-# Use pv (pipe viewer) to show progress if available, otherwise fall back to unzip
-if command -v pv >/dev/null 2>&1; then
-    pv "$IMAGE_FILE" | sudo unzip -o - "$MOUNT_POINT"
-else
-    echo "pv not found, unzipping without progress bar..."
-    sudo unzip -o "$IMAGE_FILE" -d "$MOUNT_POINT"
-fi
+unzip -o "$IMAGE_FILE" -d "$MOUNT_POINT"
 
 if [ $? -ne 0 ]; then
     echo "Error: Failed to unzip $IMAGE_FILE."
-    sudo umount "$MOUNT_POINT"
-    sudo rmdir "$MOUNT_POINT"
+    umount "$MOUNT_POINT"
+    rmdir "$MOUNT_POINT"
     exit 1
 fi
 
 # Sync to ensure all data is written
 echo "Syncing data..."
-sudo sync
+sync
 
 # Unmount and clean up
 echo "Unmounting $SD_CARD_DEVICE..."
-sudo umount "$MOUNT_POINT"
-sudo rmdir "$MOUNT_POINT"
+umount "$MOUNT_POINT"
+rmdir "$MOUNT_POINT"
 
 echo "Done! SD card is formatted and $IMAGE_FILE has been extracted."
 

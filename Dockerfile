@@ -14,7 +14,7 @@ RUN apt install -y pkg-config build-essential ninja-build automake autoconf libt
                 git gcc libssl-dev bc slib squashfs-tools android-sdk-libsparse-utils jq python3-distutils \
                 scons parallel tree python3-dev python3-pip device-tree-compiler ssh cpio fakeroot libncurses5 \
                 flex bison libncurses5-dev genext2fs rsync unzip dosfstools mtools tcl openssh-client cmake expect python-is-python3 xxd \
-                qemu-user-static proot
+                qemu-user-static proot gettext-base
 
 
 RUN pip install jinja2
@@ -41,6 +41,11 @@ RUN echo "Cache bust value: $CACHE_BUST"
 ARG ROOTFS_OVERLAY=/rootfs_overlay
 ENV ROOTFS_OVERLAY=${ROOTFS_OVERLAY}
 
+ARG DISTRO_HOSTNAME_ARG=milkv-duo
+ARG ROOTPW_ARG=milkv
+ENV DISTRO_HOSTNAME=$DISTRO_HOSTNAME_ARG
+ENV ROOTPW=$ROOTPW_ARG
+
 WORKDIR /duo-buildroot-sdk
 
 # Decompress RootFs overlay
@@ -60,14 +65,14 @@ RUN sed -i '/label="ROOTFS"/ s/size_in_kb="[0-9]*"/size_in_kb="1258291"/' /duo-b
 RUN find /duo-buildroot-sdk/buildroot-2024.02/configs -type f -name '*_defconfig' -exec sh \
               -c 'echo "BR2_ROOTFS_SKELETON_CUSTOM=y\nBR2_ROOTFS_SKELETON_CUSTOM_PATH=\"${ROOTFS_OVERLAY}\"\nBR2_ROOTFS_POST_BUILD_SCRIPT=\"/post_build.sh\"\nBR2_INIT_BUSYBOX=n\nBR2_PACKAGE_BUSYBOX=n" >> {}' \;
 
-COPY post_build.sh /
+COPY Distro/post_build.sh /
 RUN chmod +x /post_build.sh
 
 #Remove default packages we dont need.
 RUN sed -i '/^BR2_PACKAGE_/ { /_DUO_/ b; /_CVI_/ b; /_GENIMAGE/ b; d; }' /duo-buildroot-sdk/buildroot-2024.02/configs/milk*duo*_defconfig
          
 #Debug (more verbose MAKE)
-RUN sed -i 's|\${Q}\$(BR_DIR)/utils/brmake -j\${NPROC} -C \$(BR_DIR)|\$(MAKE) -d V=1 -C \$(BR_DIR)|' /duo-buildroot-sdk/build/Makefile
+#RUN sed -i 's|\${Q}\$(BR_DIR)/utils/brmake -j\${NPROC} -C \$(BR_DIR)|\$(MAKE) -d V=1 -C \$(BR_DIR)|' /duo-buildroot-sdk/build/Makefile
 
 CMD bash build.sh lunch
 
@@ -96,7 +101,64 @@ WORKDIR /duo-buildroot-sdk
 
 #RUN apt install -y gcc-riscv64-linux-gnu g++-riscv64-linux-gnu binutils-riscv64-linux-gnu
 
+RUN rm -rf device/*arm*
+
+CMD bash build.sh lunch
+
+# ------------------------------------------------------------------------------
+
+FROM duosdk AS duosdk-busybox
+
+ARG DISTRO_HOSTNAME_ARG=milkv-duo
+ENV DISTRO_HOSTNAME=$DISTRO_HOSTNAME_ARG
+ARG ROOTPW_ARG=milkv
+ENV ROOTPW=$ROOTPW_ARG
+ARG POSTBUILD
+ARG BUSYBOX_CONF
+
+WORKDIR /duo-buildroot-sdk
+
+# Increase base image size to 1G
+RUN sed -i '/^image rootfs\.ext4 {/,/^}/ s/^\(\s*size\s*=\s*\)[^ ]\+/\11G/' /duo-buildroot-sdk/device/milkv*/genimage.cfg
+RUN sed -i 's/\(BR2_TARGET_ROOTFS_EXT2_SIZE="\)[^"]*/\11G/' /duo-buildroot-sdk/buildroot-2024.02/configs/milk*duo*_defconfig
+RUN sed -i '/label="ROOTFS"/ s/size_in_kb="[0-9]*"/size_in_kb="1258291"/' /duo-buildroot-sdk/build/boards/cv181x/*milkv_duos*_emmc/partition/partition_emmc.xml
+
+COPY $BUSYBOX_CONF /tmp/busybox.conf
+COPY $POSTBUILD /
+RUN chmod +x /post_build.sh
+
+#Debug (more verbose MAKE)
+#RUN sed -i 's|\${Q}\$(BR_DIR)/utils/brmake -j\${NPROC} -C \$(BR_DIR)|\$(MAKE) -d V=1 -C \$(BR_DIR)|' /duo-buildroot-sdk/build/Makefile
+
+CMD bash build.sh lunch
+
+# ------------------------------------------------------------------------------
+
+FROM duosdk-busybox AS duosdk-busybox-arm64
+
+ENV ARCH=arm64
+ENV QEMU="qemu-aarch64-static"
+
+WORKDIR /duo-buildroot-sdk
+
+RUN rm -rf device/*risc*
+
+RUN SUBST_CONTENT=$(envsubst '$DISTRO_HOSTNAME,$ROOTPW' < /tmp/busybox.conf) && \
+    find "/duo-buildroot-sdk/buildroot-2024.02/configs" -maxdepth 1 -name "milk*_defconfig" -type f -exec sh -c 'echo "" >> "$1"; echo "$0" >> "$1"' "$SUBST_CONTENT" {} \;
+
+CMD bash build.sh lunch
+# ------------------------------------------------------------------------------
+
+FROM duosdk-busybox AS duosdk-busybox-riscv64
+
+ENV ARCH=riscv64
+ENV QEMU="qemu-riscv64-static"
+
+WORKDIR /duo-buildroot-sdk
 
 RUN rm -rf device/*arm*
+
+RUN SUBST_CONTENT=$(envsubst '$DISTRO_HOSTNAME $ROOTPW' < /tmp/busybox.conf) && \
+    find "/duo-buildroot-sdk/buildroot-2024.02/configs" -maxdepth 1 -name "milk*_defconfig" -type f -exec sh -c 'echo "" >> "$1"; echo "$0" >> "$1"' "$SUBST_CONTENT" {} \;
 
 CMD bash build.sh lunch
