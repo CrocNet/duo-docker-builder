@@ -153,7 +153,7 @@ function select_distro() {
     done
    
     # Show whiptail menu and get selection
-    selected=$(whiptail --title "Select Distribution" --menu "Choose a tar.gz file or default:" 15 60 7 "${menu_options[@]}" 3>&1 1>&2 2>&3)
+    selected=$(whiptail --title "Select Distribution" --menu "Choose build:" 15 60 7 "${menu_options[@]}" 3>&1 1>&2 2>&3)
 
     # If user cancelled
     if [ $? -ne 0 ]; then
