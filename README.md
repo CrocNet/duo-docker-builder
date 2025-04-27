@@ -45,3 +45,11 @@ Creates an SD card installer with emmc build.
 
     ./write2emmc.sh
     ./write2emmc.sh [.img file path]
+
+### Notes
+
+If you want to use your own forked sdk add the folling to `.ENV`
+
+````
+export GITSDK=https://github.com/CrocNet/duo-buildroot-sdk-v2.git
+````
