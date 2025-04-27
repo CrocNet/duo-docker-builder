@@ -48,7 +48,7 @@ Creates an SD card installer with emmc build.
 
 ### Notes
 
-If you want to use your own forked sdk add the folling to `.ENV`
+If you want to use your own forked sdk add the following to `.ENV`
 
 ````
 export GITSDK=https://github.com/CrocNet/duo-buildroot-sdk-v2.git
